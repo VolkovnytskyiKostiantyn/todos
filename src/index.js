@@ -1,7 +1,10 @@
+// import css from './styles.css';
+
 let todos = [];
 let nextId = 1;
 let currentViewMode = 'All';
 let isFirstlyRendered = false;
+let timeoutId;
 
 function createElement(tag) {
   return document.createElement(`${tag.toUpperCase()}`);
@@ -27,11 +30,65 @@ function addSrc(obj, index, node) {
   todos[index] = newObj;
 }
 
+function updateTodo(event) {
+  const indexToUpdate = todos.findIndex(
+    todo => todo.src === event.target.closest('li'),
+  );
+  clearTimeout(timeoutId);
+  clearTimeout(timeoutId - 1);
+  const updatingInputContainer = createElement('div');
+  updatingInputContainer.classList.add('updating-input-container');
+  const updatingInput = createElement('input');
+  updatingInput.type = 'text';
+  updatingInput.value = event.target.innerText;
+  const submitButton = createElement('button');
+  submitButton.type = 'button';
+  submitButton.classList.add('submit-button');
+  submitButton.innerHTML = '&#10004;';
+  const cancelButton = createElement('button');
+  cancelButton.type = 'button';
+  cancelButton.classList.add('cancel-button');
+  cancelButton.innerHTML = '&times';
+  updatingInputContainer.append(updatingInput, submitButton, cancelButton);
+  event.target.replaceWith(updatingInputContainer);
+  submitButton.addEventListener('click', (e) => {
+    todos[indexToUpdate].title = updatingInput.value;
+    renderTodos(todos, currentViewMode);
+  });
+  cancelButton.addEventListener('click', () => {
+    renderTodos(todos, currentViewMode);
+  });
+}
+
+function filterAll() {
+  currentViewMode = 'All';
+  document.querySelector('.active').classList.remove('active');
+  document.querySelector('.filter-button-all').classList.add('active');
+  renderTodos(todos, currentViewMode);
+}
+
+function filterActive() {
+  currentViewMode = 'Active';
+  document.querySelector('.active').classList.remove('active');
+  document.querySelector('.filter-button-active').classList.add('active');
+  renderTodos(todos, currentViewMode);
+}
+
+function filterCompleted() {
+  currentViewMode = 'Completed';
+  document.querySelector('.active').classList.remove('active');
+  document.querySelector('.filter-button-completed').classList.add('active');
+  renderTodos(todos, currentViewMode);
+}
+
 function addEventListeners() {
   document.querySelector('.input-field').addEventListener('keyup', addTodo);
 
-  const checkboxes = document.querySelectorAll('.checkbox');
-  checkboxes.forEach((checkbox) => {
+  const titleSpans = document.querySelectorAll('.title-span');
+  titleSpans.forEach((span) => {
+    span.addEventListener('dblclick', updateTodo);
+  });
+  titleSpans.forEach((checkbox) => {
     checkbox.addEventListener('click', toggleReadyState);
   });
 
@@ -41,30 +98,19 @@ function addEventListeners() {
   });
 
   const filterAllButton = document.querySelector('.filter-button-all');
-  filterAllButton.addEventListener('click', () => {
-    currentViewMode = 'All';
-    document.querySelector('.active').classList.remove('active');
-    document.querySelector('.filter-button-all').classList.add('active');
-    renderTodos(todos, currentViewMode);
-  });
+  filterAllButton.addEventListener('click', filterAll);
 
   const filterActiveButton = document.querySelector('.filter-button-active');
-  filterActiveButton.addEventListener('click', () => {
-    currentViewMode = 'Active';
-    document.querySelector('.active').classList.remove('active');
-    document.querySelector('.filter-button-active').classList.add('active');
-    renderTodos(todos, currentViewMode);
-  });
+  filterActiveButton.addEventListener('click', filterActive);
 
-  const filterCompletedButton = document.querySelector('.filter-button-completed');
-  filterCompletedButton.addEventListener('click', () => {
-    currentViewMode = 'Completed';
-    document.querySelector('.active').classList.remove('active');
-    document.querySelector('.filter-button-completed').classList.add('active');
-    renderTodos(todos, currentViewMode);
-  });
+  const filterCompletedButton = document.querySelector(
+    '.filter-button-completed',
+  );
+  filterCompletedButton.addEventListener('click', filterCompleted);
 
-  document.querySelector('.clear-completed-button').addEventListener('click', clearCompleted);
+  document
+    .querySelector('.clear-completed-button')
+    .addEventListener('click', clearCompleted);
 }
 
 function fillTodoList(todo, index, todoList) {
@@ -78,20 +124,18 @@ function fillTodoList(todo, index, todoList) {
   checkbox.checked = todo.isCompleted;
   checkbox.classList.add('checkbox');
 
-  const checkboxLabel = createElement('label');
-  checkboxLabel.htmlFor = `checkbox_${todo.id}`;
   const todoTitle = createElement('span');
+  todoTitle.classList.add('title-span');
   if (todo.isCompleted) {
     todoTitle.classList.add('completed');
   }
-  todoTitle.innerHTML = todo.title;
-  checkboxLabel.append(todoTitle);
+  todoTitle.innerText = todo.title;
 
   const removeButton = createElement('button');
   removeButton.innerHTML = '&times';
   removeButton.classList.add('remove-button');
   removeButton.type = 'button';
-  connector.append(checkbox, checkboxLabel);
+  connector.append(checkbox, todoTitle);
   todoItem.append(connector, removeButton);
 
   todoList.append(todoItem);
@@ -101,14 +145,15 @@ function fillTodoList(todo, index, todoList) {
 function renderTodos(todosArr, viewMode) {
   if (document.querySelector('ul')) {
     while (document.querySelector('ul').firstChild) {
-      document.querySelector('ul').removeChild(document.querySelector('ul').firstChild);
+      document
+        .querySelector('ul')
+        .removeChild(document.querySelector('ul').firstChild);
     }
   }
   let mainContainer = document.querySelector('.main-container');
   let inputField = document.querySelector('.input-field');
   let todosContainer = document.querySelector('.todos-container');
   let todoList = document.querySelector('.todo-list');
-
 
   if (!isFirstlyRendered) {
     mainContainer = createElement('section');
@@ -141,7 +186,11 @@ function renderTodos(todosArr, viewMode) {
     showCompletedButton.type = 'button';
     showCompletedButton.classList.add('filter-button-completed');
     showCompletedButton.innerText = 'Completed';
-    buttonsContainer.append(showAllButton, showActiveButton, showCompletedButton);
+    buttonsContainer.append(
+      showAllButton,
+      showActiveButton,
+      showCompletedButton,
+    );
 
     const clearCompletedButton = createElement('button');
     clearCompletedButton.type = 'button';
@@ -155,7 +204,6 @@ function renderTodos(todosArr, viewMode) {
     addEventListeners();
     isFirstlyRendered = true;
   }
-
 
   if (viewMode === 'All') {
     todosArr.forEach((todo, index) => {
@@ -176,6 +224,7 @@ function renderTodos(todosArr, viewMode) {
   }
   todosContainer.append(todoList);
   updateItemsLeft(todos);
+  addEventListeners();
 }
 
 function addTodo(event) {
@@ -186,7 +235,6 @@ function addTodo(event) {
       id: nextId,
     });
     renderTodos(todos, currentViewMode);
-    addEventListeners();
     updateItemsLeft(todos);
     nextId += 1;
     document.querySelector('.input-field').value = '';
@@ -194,40 +242,40 @@ function addTodo(event) {
 }
 
 function removeTodo(event) {
-  const indexToDelete = todos.findIndex(todo => todo.src === event.target.parentNode);
+  const indexToDelete = todos.findIndex(
+    todo => todo.src === event.target.parentNode,
+  );
   if (indexToDelete + 1) {
     todos.splice(indexToDelete, 1);
   }
   renderTodos(todos, currentViewMode);
-  addEventListeners();
   updateItemsLeft(todos);
 }
 
 function clearCompleted() {
   todos = todos.filter(todo => !todo.isCompleted === true);
   renderTodos(todos, currentViewMode);
-  addEventListeners();
   updateItemsLeft(todos);
 }
 
-
 function toggleReadyState(event) {
-  let isChoosenCompleted = false;
-  const choosenIndex = todos.findIndex((todo) => {
-    if (todo.src === event.target.closest('LI')) {
-      isChoosenCompleted = todo.isCompleted;
-      return true;
+  timeoutId = setTimeout(() => {
+    let isChoosenCompleted = false;
+    const choosenIndex = todos.findIndex((todo) => {
+      if (todo.src === event.target.closest('LI')) {
+        isChoosenCompleted = todo.isCompleted;
+        return true;
+      }
+      return false;
+    });
+    if (isChoosenCompleted) {
+      todos[choosenIndex].isCompleted = false;
+    } else {
+      todos[choosenIndex].isCompleted = true;
     }
-    return false;
-  });
-  if (isChoosenCompleted) {
-    todos[choosenIndex].isCompleted = false;
-  } else {
-    todos[choosenIndex].isCompleted = true;
-  }
-  renderTodos(todos, currentViewMode);
-  addEventListeners();
-  updateItemsLeft(todos);
+    renderTodos(todos, currentViewMode);
+    updateItemsLeft(todos);
+  }, 0);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
