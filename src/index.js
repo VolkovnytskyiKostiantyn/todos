@@ -1,9 +1,9 @@
 import css from './styles.css';
 
 let todos = [];
-let nextId = 1;
 let currentViewMode = 'All';
 let timeoutId;
+let nextId = 0;
 
 
 function createElement(tagName) {
@@ -36,6 +36,7 @@ async function addToDB(todoTitle, todosCopy) {
     body: JSON.stringify({ title: `${todoTitle}` }),
   });
   const result = await response.json();
+  console.log(result);
   fetchTodos(todosCopy);
 }
 
@@ -56,6 +57,8 @@ async function removeFromDB(id, todosCopy) {
 }
 
 async function updateInDB(idToUpdate, newProp, todosCopy) {
+  console.log('++++');
+  console.log(idToUpdate, newProp);
   const response = await fetch('http://localhost:9999', {
     method: 'PUT',
     headers: {
@@ -75,34 +78,16 @@ function updateItemsLeft(todosArr) {
     }
   });
   if (left === 1) {
-    document.querySelector('.quantity').innerText = '1 item left';
+    document.querySelector('.quantity').innerText = '1 item ' + ' left';
   } else {
     document.querySelector('.quantity').innerText = `${todosArr.filter(todo => todo.isCompleted === false).length} items left`;
   }
 }
 
-
-function addSrc(obj, index, node) {
-  const newObj = Object.assign({}, obj);
-  newObj.src = node;
-  todos[index] = newObj;
-}
-
-function updateSrc(newTodos, oldTodos) {
-  for (let i = 0; i < newTodos.length; i++) {
-    newTodos[i].src = oldTodos[i].src;
-  }
-  // newTodos.forEach(newTodo, index) {
-  //   newTodo.src = oldTodos[index].src;
-  // }
-}
-
 function updateTodo(event) {
+  const reserveCopy = [...todos];
   const indexToUpdate = todos.findIndex(
-    (todo) => {
-      console.log(todos.src);
-      return todo.src === event.target.closest('li');
-    },
+    todo => todo._id === event.target.closest('li').id,
   );
   console.log(indexToUpdate);
   const updatingInputContainer = createElement('div');
@@ -120,37 +105,46 @@ function updateTodo(event) {
   cancelButton.innerHTML = '&times';
   updatingInputContainer.append(updatingInput, submitButton, cancelButton);
   event.target.replaceWith(updatingInputContainer);
+  updatingInput.focus();
   submitButton.addEventListener('click', () => {
     if (indexToUpdate + 1) {
       todos[indexToUpdate].title = updatingInput.value;
-      updateInDB(indexToUpdate, { title: updatingInput.value });
-      fetchTodos();
+      console.log(todos[indexToUpdate].title);
+      updateInDB(todos[indexToUpdate]._id, { title: todos[indexToUpdate].title });
       renderTodos(todos, currentViewMode);
     }
   });
   cancelButton.addEventListener('click', () => {
-    fetchTodos();
     renderTodos(todos, currentViewMode);
   });
 }
 
 function filterAll() {
   currentViewMode = 'All';
-  document.querySelector('.active').classList.remove('active');
+  console.log(document.querySelector('.active'));
+  document.querySelectorAll('.active').forEach((node) => {
+    node.classList.remove('active');
+  });
   document.querySelector('.filter-button-all').classList.add('active');
   renderTodos(todos, currentViewMode);
 }
 
 function filterActive() {
   currentViewMode = 'Active';
-  document.querySelector('.active').classList.remove('active');
+  console.log(document.querySelector('.active'));
+  document.querySelectorAll('.active').forEach((node) => {
+    node.classList.remove('active');
+  });
   document.querySelector('.filter-button-active').classList.add('active');
   renderTodos(todos, currentViewMode);
 }
 
 function filterCompleted() {
   currentViewMode = 'Completed';
-  document.querySelector('.active').classList.remove('active');
+  console.log(document.querySelector('.active'));
+  document.querySelectorAll('.active').forEach((node) => {
+    node.classList.remove('active');
+  });
   document.querySelector('.filter-button-completed').classList.add('active');
   renderTodos(todos, currentViewMode);
 }
@@ -160,21 +154,21 @@ function addEventListeners() {
 
   document.querySelector('.input-field').addEventListener('keydown', addTodo);
 
+  document.querySelectorAll('click', (event) => {
+    event.preventDefault();
+  });
+
   const titleSpans = document.querySelectorAll('.title-span');
   titleSpans.forEach((span) => {
-    span.addEventListener('dblclick', updateTodo);
+    span.addEventListener('click', (event) => {
+      timeoutId = setTimeout(() => toggleReadyState(event), 200);
+    });
   });
-  titleSpans.forEach((checkbox) => {
-    checkbox.addEventListener('click', (event) => {
-      if (isDoubleClick) {
-        updateTodo(event);
-      } else {
-        toggleReadyState(event);
-      }
-      isDoubleClick = true;
-      timeoutId = setTimeout(() => {
-        isDoubleClick = false;
-      }, 0);
+  titleSpans.forEach((span) => {
+    span.addEventListener('dblclick', (event) => {
+      clearTimeout(timeoutId);
+      clearTimeout(timeoutId - 1);
+      updateTodo(event);
     });
   });
 
@@ -187,16 +181,17 @@ function addEventListeners() {
   filterAllButton.addEventListener('click', filterAll);
 
   const filterActiveButton = document.querySelector('.filter-button-active');
-  filterAllButton.addEventListener('click', filterActive);
+  filterActiveButton.addEventListener('click', filterActive);
 
   const filterCompletedButton = document.querySelector('.filter-button-completed');
-  filterAllButton.addEventListener('click', filterCompleted);
+  filterCompletedButton.addEventListener('click', filterCompleted);
 
   document.querySelector('.clear-completed-button').addEventListener('click', clearCompleted);
 }
 
 function fillTodoList(todo, index, todoList) {
   const todoItem = createElement('li');
+  todoItem.id = todo._id || null;
   const connector = createElement('div');
   connector.classList.add('connector');
   todoItem.classList.add('todo-item');
@@ -221,7 +216,7 @@ function fillTodoList(todo, index, todoList) {
   todoItem.append(connector, removeButton);
 
   todoList.append(todoItem);
-  addSrc(todo, index, todoItem);
+  // addSrc(todo, index, todoItem);
 }
 
 function renderTodos(todosArr, viewMode) {
@@ -267,9 +262,8 @@ function renderTodos(todosArr, viewMode) {
   if (!document.querySelector('.filter-button-all')) {
     showAllButton.type = 'button';
     showAllButton.classList.add('filter-button-all');
+    showAllButton.innerText = 'All';
   }
-  showAllButton.classList.add('active');
-  showAllButton.innerText = 'All';
   const showActiveButton = document.querySelector('.filter-button-active') || createElement('button');
   if (!document.querySelector('.filter-button-active')) {
     showActiveButton.type = 'button';
@@ -298,15 +292,18 @@ function renderTodos(todosArr, viewMode) {
 
   if (viewMode === 'All') {
     todosArr.forEach((todo, index) => {
+      showAllButton.classList.add('active');
       fillTodoList(todo, index, todoList);
     });
   } else if (viewMode === 'Active') {
+    showActiveButton.classList.add('active');
     todos.forEach((todo, index) => {
       if (!todo.isCompleted) {
         fillTodoList(todo, index, todoList);
       }
     });
   } else if (viewMode === 'Completed') {
+    showCompletedButton.classList.add('active');
     todos.forEach((todo, index) => {
       if (todo.isCompleted) {
         fillTodoList(todo, index, todoList);
@@ -324,7 +321,7 @@ function addTodo(event) {
     const newTodo = {
       title: event.target.value,
       isCompleted: false,
-      _id: nextId,
+      id: nextId,
     };
     todos.push(newTodo);
     renderTodos(todos, currentViewMode);
@@ -333,18 +330,21 @@ function addTodo(event) {
     addToDB(event.target.value, reserveCopy);
     event.target.value = '';
     event.target.focus();
+    renderTodos(todos);
   }
 }
 
 async function removeTodo(event) {
   const reserveCopy = [...todos];
-  const index = todos.findIndex(todo => todo.src === event.target.closest('LI'));
+  const index = todos.findIndex(todo => todo._id === event.target.closest('LI').id);
+  const idToDelete = todos[index]._id;
+  console.log(event.target.closest('LI').id);
   if (index + 1) {
     console.log(event.target.closest('LI'));
     const deletedTodo = todos.splice(index, 1);
     renderTodos(todos, currentViewMode);
 
-    removeFromDB(todos[index]._id, reserveCopy);
+    removeFromDB(idToDelete, reserveCopy);
     // if ((todos.findIndex(todo => todo._id === index) + 1)) {
     renderTodos(todos, currentViewMode);
     // }
@@ -353,35 +353,38 @@ async function removeTodo(event) {
 
 
 function clearCompleted() {
+  const reserveCopy = [...todos];
   todos = todos.filter(todo => !todo.isCompleted === true);
-  fetchTodos();
   renderTodos(todos, currentViewMode);
+  reserveCopy.forEach((todo) => {
+    if (todo.isCompleted) {
+      removeFromDB(todo._id, reserveCopy);
+    }
+  });
 }
 
 
 function toggleReadyState(event) {
-  timeoutId = setTimeout(() => {
-    const reserveCopy = [...todos];
-    let isChoosenCompleted = false;
-    console.log(event.target.closest('LI'));
-    const choosenIndex = todos.findIndex((todo) => {
-      if (todo.src === event.target.closest('LI')) {
-        isChoosenCompleted = todo.isCompleted;
-        console.log(todo.src);
-        return true;
-      }
-      return false;
-    });
-    console.log(choosenIndex);
-    console.log(todos);
-    if (isChoosenCompleted) {
-      todos[choosenIndex].isCompleted = false;
-    } else {
-      todos[choosenIndex].isCompleted = true;
+  const reserveCopy = [...todos];
+  let isChoosenCompleted = false;
+  console.log(event.target.closest('LI'));
+  const choosenIndex = todos.findIndex((todo) => {
+    if (todo._id === event.target.closest('LI').id) {
+      isChoosenCompleted = todo.isCompleted;
+      return true;
     }
-    updateInDB(todos[choosenIndex]._id, { isCompleted: !todos[choosenIndex].isCompleted }, reserveCopy);
-    renderTodos(todos, currentViewMode);
-  }, 0);
+    return false;
+  });
+  console.log(choosenIndex);
+  console.log(todos);
+  if (isChoosenCompleted) {
+    todos[choosenIndex].isCompleted = false;
+    updateInDB(todos[choosenIndex]._id, { isCompleted: false }, reserveCopy);
+  } else {
+    todos[choosenIndex].isCompleted = true;
+    updateInDB(todos[choosenIndex]._id, { isCompleted: true }, reserveCopy);
+  }
+  renderTodos(todos, currentViewMode);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
