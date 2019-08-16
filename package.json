@@ -19,7 +19,7 @@
   "bugs": {
     "url": "https://github.com/VolkovnytskyiKostiantyn/todo-list/issues"
   },
-  "homepage": "https://github.com/VolkovnytskyiKostiantyn/todo-list#readme",
+  "homepage": "https://github.com/VolkovnytskyiKostiantyn/todo-list",
   "devDependencies": {
     "@babel/cli": "^7.0.0",
     "@babel/core": "^7.5.5",
@@ -30,10 +30,14 @@
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-react": "^7.14.3",
+    "nodemon": "^1.19.1",
     "webpack": "^4.39.1",
     "webpack-cli": "^3.3.6"
   },
   "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "mongodb": "^3.3.0-beta2",
     "style-loader": "^1.0.0",
     "webpack-dev-server": "^3.8.0"
   }

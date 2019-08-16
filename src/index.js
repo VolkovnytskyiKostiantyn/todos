@@ -1,13 +1,70 @@
-// import css from './styles.css';
+import css from './styles.css';
 
 let todos = [];
 let nextId = 1;
 let currentViewMode = 'All';
-let isFirstlyRendered = false;
 let timeoutId;
 
-function createElement(tag) {
-  return document.createElement(`${tag.toUpperCase()}`);
+
+function createElement(tagName) {
+  return document.createElement(`${tagName.toUpperCase()}`);
+}
+
+async function fetchTodos(todosCopy = null) {
+  const response = await fetch('http://localhost:9999', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8',
+    },
+  });
+  const result = await response.json();
+  console.log(result);
+  console.log(response.ok);
+  if (response.ok) {
+    todos = result;
+  } else if (todosCopy) {
+    todos = todosCopy;
+  }
+}
+
+async function addToDB(todoTitle, todosCopy) {
+  const response = await fetch('http://localhost:9999', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8',
+    },
+    body: JSON.stringify({ title: `${todoTitle}` }),
+  });
+  const result = await response.json();
+  fetchTodos(todosCopy);
+}
+
+async function removeFromDB(id, todosCopy) {
+  const response = await fetch('http://localhost:9999', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8',
+    },
+    body: JSON.stringify(
+      { _id: `${id}` },
+    ),
+  });
+  fetchTodos(todosCopy);
+  console.log(response);
+  // if (response.ok && todos.length =)
+  console.log(todos[index]._id);
+}
+
+async function updateInDB(idToUpdate, newProp, todosCopy) {
+  const response = await fetch('http://localhost:9999', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8',
+    },
+    body: JSON.stringify({ _id: idToUpdate, updKeyValue: newProp }),
+  });
+  console.log(response.json());
+  fetchTodos(todosCopy);
 }
 
 function updateItemsLeft(todosArr) {
@@ -18,11 +75,12 @@ function updateItemsLeft(todosArr) {
     }
   });
   if (left === 1) {
-    document.querySelector('.quantity').innerText = `${left} item left`;
+    document.querySelector('.quantity').innerText = '1 item left';
   } else {
-    document.querySelector('.quantity').innerText = `${left} items left`;
+    document.querySelector('.quantity').innerText = `${todosArr.filter(todo => todo.isCompleted === false).length} items left`;
   }
 }
+
 
 function addSrc(obj, index, node) {
   const newObj = Object.assign({}, obj);
@@ -30,12 +88,23 @@ function addSrc(obj, index, node) {
   todos[index] = newObj;
 }
 
+function updateSrc(newTodos, oldTodos) {
+  for (let i = 0; i < newTodos.length; i++) {
+    newTodos[i].src = oldTodos[i].src;
+  }
+  // newTodos.forEach(newTodo, index) {
+  //   newTodo.src = oldTodos[index].src;
+  // }
+}
+
 function updateTodo(event) {
   const indexToUpdate = todos.findIndex(
-    todo => todo.src === event.target.closest('li'),
+    (todo) => {
+      console.log(todos.src);
+      return todo.src === event.target.closest('li');
+    },
   );
-  clearTimeout(timeoutId);
-  clearTimeout(timeoutId - 1);
+  console.log(indexToUpdate);
   const updatingInputContainer = createElement('div');
   updatingInputContainer.classList.add('updating-input-container');
   const updatingInput = createElement('input');
@@ -51,11 +120,16 @@ function updateTodo(event) {
   cancelButton.innerHTML = '&times';
   updatingInputContainer.append(updatingInput, submitButton, cancelButton);
   event.target.replaceWith(updatingInputContainer);
-  submitButton.addEventListener('click', (e) => {
-    todos[indexToUpdate].title = updatingInput.value;
-    renderTodos(todos, currentViewMode);
+  submitButton.addEventListener('click', () => {
+    if (indexToUpdate + 1) {
+      todos[indexToUpdate].title = updatingInput.value;
+      updateInDB(indexToUpdate, { title: updatingInput.value });
+      fetchTodos();
+      renderTodos(todos, currentViewMode);
+    }
   });
   cancelButton.addEventListener('click', () => {
+    fetchTodos();
     renderTodos(todos, currentViewMode);
   });
 }
@@ -82,14 +156,26 @@ function filterCompleted() {
 }
 
 function addEventListeners() {
-  document.querySelector('.input-field').addEventListener('keyup', addTodo);
+  let isDoubleClick;
+
+  document.querySelector('.input-field').addEventListener('keydown', addTodo);
 
   const titleSpans = document.querySelectorAll('.title-span');
   titleSpans.forEach((span) => {
     span.addEventListener('dblclick', updateTodo);
   });
   titleSpans.forEach((checkbox) => {
-    checkbox.addEventListener('click', toggleReadyState);
+    checkbox.addEventListener('click', (event) => {
+      if (isDoubleClick) {
+        updateTodo(event);
+      } else {
+        toggleReadyState(event);
+      }
+      isDoubleClick = true;
+      timeoutId = setTimeout(() => {
+        isDoubleClick = false;
+      }, 0);
+    });
   });
 
   const removeButtons = document.querySelectorAll('.remove-button');
@@ -101,16 +187,12 @@ function addEventListeners() {
   filterAllButton.addEventListener('click', filterAll);
 
   const filterActiveButton = document.querySelector('.filter-button-active');
-  filterActiveButton.addEventListener('click', filterActive);
+  filterAllButton.addEventListener('click', filterActive);
 
-  const filterCompletedButton = document.querySelector(
-    '.filter-button-completed',
-  );
-  filterCompletedButton.addEventListener('click', filterCompleted);
+  const filterCompletedButton = document.querySelector('.filter-button-completed');
+  filterAllButton.addEventListener('click', filterCompleted);
 
-  document
-    .querySelector('.clear-completed-button')
-    .addEventListener('click', clearCompleted);
+  document.querySelector('.clear-completed-button').addEventListener('click', clearCompleted);
 }
 
 function fillTodoList(todo, index, todoList) {
@@ -120,7 +202,7 @@ function fillTodoList(todo, index, todoList) {
   todoItem.classList.add('todo-item');
   const checkbox = createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.id = `checkbox_${todo.id}`;
+  checkbox.id = `checkbox_${todo._id}`;
   checkbox.checked = todo.isCompleted;
   checkbox.classList.add('checkbox');
 
@@ -145,65 +227,74 @@ function fillTodoList(todo, index, todoList) {
 function renderTodos(todosArr, viewMode) {
   if (document.querySelector('ul')) {
     while (document.querySelector('ul').firstChild) {
-      document
-        .querySelector('ul')
-        .removeChild(document.querySelector('ul').firstChild);
+      document.querySelector('ul').removeChild(document.querySelector('ul').firstChild);
     }
   }
-  let mainContainer = document.querySelector('.main-container');
-  let inputField = document.querySelector('.input-field');
-  let todosContainer = document.querySelector('.todos-container');
-  let todoList = document.querySelector('.todo-list');
 
-  if (!isFirstlyRendered) {
-    mainContainer = createElement('section');
+
+  const mainContainer = document.querySelector('.main-container') || createElement('section');
+  if (!document.querySelector('.main-container')) {
     mainContainer.classList.add('main-container');
-    inputField = createElement('input');
+  }
+  const inputField = document.querySelector('.input-field') || createElement('input');
+  if (!document.querySelector('.input-field')) {
     inputField.classList.add('input-field');
-    todosContainer = createElement('div');
+    inputField.type = 'text';
+  }
+  const todosContainer = document.querySelector('.todos-container') || createElement('div');
+  if (!document.querySelector('.todos-container')) {
     todosContainer.classList.add('todos-container');
-    todoList = createElement('ul');
+  }
+  const todoList = document.querySelector('.todo-list') || createElement('ul');
+  if (!document.querySelector('.todo-list')) {
     todoList.classList.add('todo-list');
-
-    const bottomPanel = createElement('div');
+  }
+  const bottomPanel = document.querySelector('.botom-panel') || createElement('div');
+  if (!document.querySelector('.botom-panel')) {
     bottomPanel.classList.add('botom-panel');
+  }
 
-    const itemsLeft = createElement('span');
+  const itemsLeft = document.querySelector('.quantity') || createElement('span');
+  if (!document.querySelector('.quantity')) {
     itemsLeft.classList.add('quantity');
+  }
 
-    const buttonsContainer = createElement('div');
+  const buttonsContainer = document.querySelector('.filter-buttons-container') || createElement('div');
+  if (!document.querySelector('.filter-buttons-container')) {
     buttonsContainer.classList.add('filter-buttons-container');
-    const showAllButton = createElement('button');
+  }
+  const showAllButton = document.querySelector('.filter-button-all') || createElement('button');
+  if (!document.querySelector('.filter-button-all')) {
     showAllButton.type = 'button';
     showAllButton.classList.add('filter-button-all');
-    showAllButton.classList.add('active');
-    showAllButton.innerText = 'All';
-    const showActiveButton = createElement('button');
+  }
+  showAllButton.classList.add('active');
+  showAllButton.innerText = 'All';
+  const showActiveButton = document.querySelector('.filter-button-active') || createElement('button');
+  if (!document.querySelector('.filter-button-active')) {
     showActiveButton.type = 'button';
     showActiveButton.classList.add('filter-button-active');
     showActiveButton.innerText = 'Active';
-    const showCompletedButton = createElement('button');
+  }
+
+  const showCompletedButton = document.querySelector('.filter-button-completed') || createElement('button');
+  if (!document.querySelector('.filter-button-completed')) {
     showCompletedButton.type = 'button';
     showCompletedButton.classList.add('filter-button-completed');
     showCompletedButton.innerText = 'Completed';
-    buttonsContainer.append(
-      showAllButton,
-      showActiveButton,
-      showCompletedButton,
-    );
+    buttonsContainer.append(showAllButton, showActiveButton, showCompletedButton);
+  }
 
-    const clearCompletedButton = createElement('button');
+  const clearCompletedButton = document.querySelector('.clear-completed-button') || createElement('button');
+  if (!document.querySelector('.clear-completed-button')) {
     clearCompletedButton.type = 'button';
     clearCompletedButton.classList.add('clear-completed-button');
     clearCompletedButton.innerText = 'Clear Completed';
     bottomPanel.append(itemsLeft, buttonsContainer, clearCompletedButton);
-
-    mainContainer.append(inputField, todosContainer, bottomPanel);
-    document.body.append(mainContainer);
-
-    addEventListeners();
-    isFirstlyRendered = true;
   }
+
+  mainContainer.append(inputField, todosContainer, bottomPanel);
+  document.body.append(mainContainer);
 
   if (viewMode === 'All') {
     todosArr.forEach((todo, index) => {
@@ -228,57 +319,72 @@ function renderTodos(todosArr, viewMode) {
 }
 
 function addTodo(event) {
+  const reserveCopy = [...todos];
   if (event.key === 'Enter') {
-    todos.push({
+    const newTodo = {
       title: event.target.value,
       isCompleted: false,
-      id: nextId,
-    });
+      _id: nextId,
+    };
+    todos.push(newTodo);
     renderTodos(todos, currentViewMode);
     updateItemsLeft(todos);
     nextId += 1;
-    document.querySelector('.input-field').value = '';
+    addToDB(event.target.value, reserveCopy);
+    event.target.value = '';
+    event.target.focus();
   }
 }
 
-function removeTodo(event) {
-  const indexToDelete = todos.findIndex(
-    todo => todo.src === event.target.parentNode,
-  );
-  if (indexToDelete + 1) {
-    todos.splice(indexToDelete, 1);
+async function removeTodo(event) {
+  const reserveCopy = [...todos];
+  const index = todos.findIndex(todo => todo.src === event.target.closest('LI'));
+  if (index + 1) {
+    console.log(event.target.closest('LI'));
+    const deletedTodo = todos.splice(index, 1);
+    renderTodos(todos, currentViewMode);
+
+    removeFromDB(todos[index]._id, reserveCopy);
+    // if ((todos.findIndex(todo => todo._id === index) + 1)) {
+    renderTodos(todos, currentViewMode);
+    // }
   }
-  renderTodos(todos, currentViewMode);
-  updateItemsLeft(todos);
 }
+
 
 function clearCompleted() {
   todos = todos.filter(todo => !todo.isCompleted === true);
+  fetchTodos();
   renderTodos(todos, currentViewMode);
-  updateItemsLeft(todos);
 }
+
 
 function toggleReadyState(event) {
   timeoutId = setTimeout(() => {
+    const reserveCopy = [...todos];
     let isChoosenCompleted = false;
+    console.log(event.target.closest('LI'));
     const choosenIndex = todos.findIndex((todo) => {
       if (todo.src === event.target.closest('LI')) {
         isChoosenCompleted = todo.isCompleted;
+        console.log(todo.src);
         return true;
       }
       return false;
     });
+    console.log(choosenIndex);
+    console.log(todos);
     if (isChoosenCompleted) {
       todos[choosenIndex].isCompleted = false;
     } else {
       todos[choosenIndex].isCompleted = true;
     }
+    updateInDB(todos[choosenIndex]._id, { isCompleted: !todos[choosenIndex].isCompleted }, reserveCopy);
     renderTodos(todos, currentViewMode);
-    updateItemsLeft(todos);
   }, 0);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchTodos();
   renderTodos(todos, currentViewMode);
-  updateItemsLeft(todos);
 });
