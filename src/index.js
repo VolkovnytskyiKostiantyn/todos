@@ -9,64 +9,59 @@ let nextId = 0;
 function createElement(tagName) {
   return document.createElement(`${tagName.toUpperCase()}`);
 }
-
-async function fetchTodos(todosCopy = null) {
-  const response = await fetch('http://localhost:9999', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json;charset=utf-8',
-    },
-  });
-  const result = await response.json();
-  console.log(result);
-  console.log(response.ok);
-  if (response.ok) {
-    todos = result;
-  } else if (todosCopy) {
-    todos = todosCopy;
+async function callApi(type, customBody = null) {
+  let response;
+  if (type === 'GET' || type === 'HEAD') {
+    response = await fetch('http://localhost:9999', {
+      method: type,
+      headers: {
+        'Content-Type': 'application/json;charset=utf-8',
+      },
+    });
+  } else {
+    response = await fetch('http://localhost:9999', {
+      method: type,
+      headers: {
+        'Content-Type': 'application/json;charset=utf-8',
+      },
+      body: JSON.stringify(customBody),
+    });
   }
+  console.log(response);
+  return response;
+}
+async function fetchTodos(todosCopy = null) {
+  let isResponseOk = false;
+  callApi('GET')
+    .then((response) => {
+      isResponseOk = response.ok;
+      return response.json();
+    })
+    .then((result) => {
+      console.log(result);
+      if (isResponseOk) {
+        todos = result;
+      } else if (todosCopy) {
+        todos = todosCopy;
+      }
+      console.log(todos);
+      renderTodos(todos);
+    })
+    .catch(err => console.log(err));
 }
 
 async function addToDB(todoTitle, todosCopy) {
-  const response = await fetch('http://localhost:9999', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json;charset=utf-8',
-    },
-    body: JSON.stringify({ title: `${todoTitle}` }),
-  });
-  const result = await response.json();
-  console.log(result);
+  callApi('POST', { title: `${todoTitle}` }).then(response => response.json()).catch(err => console.log(err));
   fetchTodos(todosCopy);
 }
 
 async function removeFromDB(id, todosCopy) {
-  const response = await fetch('http://localhost:9999', {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json;charset=utf-8',
-    },
-    body: JSON.stringify(
-      { _id: `${id}` },
-    ),
-  });
+  callApi('DELETE', { _id: `${id}` }).then(response => response.json()).catch(err => console.log(err));
   fetchTodos(todosCopy);
-  console.log(response);
-  // if (response.ok && todos.length =)
-  console.log(todos[index]._id);
 }
 
 async function updateInDB(idToUpdate, newProp, todosCopy) {
-  console.log('++++');
-  console.log(idToUpdate, newProp);
-  const response = await fetch('http://localhost:9999', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json;charset=utf-8',
-    },
-    body: JSON.stringify({ _id: idToUpdate, updKeyValue: newProp }),
-  });
-  console.log(response.json());
+  callApi('PUT', { _id: idToUpdate, updKeyValue: newProp }).then(response => response.json()).catch(err => console.log(err));
   fetchTodos(todosCopy);
 }
 
@@ -119,34 +114,38 @@ function updateTodo(event) {
   });
 }
 
-function filterAll() {
-  currentViewMode = 'All';
-  console.log(document.querySelector('.active'));
-  document.querySelectorAll('.active').forEach((node) => {
-    node.classList.remove('active');
-  });
-  document.querySelector('.filter-button-all').classList.add('active');
-  renderTodos(todos, currentViewMode);
-}
-
-function filterActive() {
-  currentViewMode = 'Active';
-  console.log(document.querySelector('.active'));
-  document.querySelectorAll('.active').forEach((node) => {
-    node.classList.remove('active');
-  });
-  document.querySelector('.filter-button-active').classList.add('active');
-  renderTodos(todos, currentViewMode);
-}
-
-function filterCompleted() {
-  currentViewMode = 'Completed';
-  console.log(document.querySelector('.active'));
-  document.querySelectorAll('.active').forEach((node) => {
-    node.classList.remove('active');
-  });
-  document.querySelector('.filter-button-completed').classList.add('active');
-  renderTodos(todos, currentViewMode);
+function filter(viewMode) {
+  switch (viewMode) {
+    case 'All':
+      currentViewMode = 'All';
+      console.log(document.querySelector('.active'));
+      document.querySelectorAll('.active').forEach((node) => {
+        node.classList.remove('active');
+      });
+      document.querySelector('.filter-button-all').classList.add('active');
+      renderTodos(todos, currentViewMode);
+      break;
+    case 'Active':
+      currentViewMode = 'Active';
+      console.log(document.querySelector('.active'));
+      document.querySelectorAll('.active').forEach((node) => {
+        node.classList.remove('active');
+      });
+      document.querySelector('.filter-button-active').classList.add('active');
+      renderTodos(todos, currentViewMode);
+      break;
+    case 'Completed':
+      currentViewMode = 'Completed';
+      console.log(document.querySelector('.active'));
+      document.querySelectorAll('.active').forEach((node) => {
+        node.classList.remove('active');
+      });
+      document.querySelector('.filter-button-completed').classList.add('active');
+      renderTodos(todos, currentViewMode);
+      break;
+    default:
+      break;
+  }
 }
 
 function addEventListeners() {
@@ -178,13 +177,13 @@ function addEventListeners() {
   });
 
   const filterAllButton = document.querySelector('.filter-button-all');
-  filterAllButton.addEventListener('click', filterAll);
+  filterAllButton.addEventListener('click', () => filter('All'));
 
   const filterActiveButton = document.querySelector('.filter-button-active');
-  filterActiveButton.addEventListener('click', filterActive);
+  filterActiveButton.addEventListener('click', () => filter('Active'));
 
   const filterCompletedButton = document.querySelector('.filter-button-completed');
-  filterCompletedButton.addEventListener('click', filterCompleted);
+  filterCompletedButton.addEventListener('click', () => filter('Completed'));
 
   document.querySelector('.clear-completed-button').addEventListener('click', clearCompleted);
 }
@@ -219,7 +218,7 @@ function fillTodoList(todo, index, todoList) {
   // addSrc(todo, index, todoItem);
 }
 
-function renderTodos(todosArr, viewMode) {
+function renderTodos(todosArr, viewMode = currentViewMode) {
   if (document.querySelector('ul')) {
     while (document.querySelector('ul').firstChild) {
       document.querySelector('ul').removeChild(document.querySelector('ul').firstChild);
