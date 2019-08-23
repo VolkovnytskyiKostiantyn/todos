@@ -97,3 +97,27 @@ span {
   color: red;
   cursor: pointer;
 }
+
+.login-form-container {
+  margin: 0 auto;
+  width: 270px;
+  border: 1px solid gray;
+  border-radius: 15px;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  text-align: center;
+  align-items: stretch;
+}
+/* label {
+  display: block;
+} */
+.inputs-container {
+  text-align: right;
+}
+
+.login-button {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
