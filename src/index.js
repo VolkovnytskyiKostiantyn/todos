@@ -1,6 +1,11 @@
 import css from './styles.css'
 
+let currentUser
+let ownTodos = []
+let externalTodos = []
 let todos = []
+let sharedUsers = []
+let externalUsers = []
 let currentViewMode = 'Login'
 let timeoutId
 let nextId = 0
@@ -9,9 +14,12 @@ let nextId = 0
 function createElement(tagName) {
   return document.createElement(`${tagName.toUpperCase()}`)
 }
+
 async function callApi(type, customBody = null, additionalPath = '/') {
   let response
   const token = localStorage.getItem('token')
+  console.log('body: ')
+  console.log(customBody)
   if (type === 'GET' || type === 'HEAD') {
     response = await fetch(`http://localhost:9999${additionalPath}`, {
       method: type,
@@ -33,7 +41,23 @@ async function callApi(type, customBody = null, additionalPath = '/') {
   console.log(response)
   return response
 }
-async function fetchTodos(todosCopy = null) {
+function fetchData(todosCopy = null) {
+  console.log('fetching')
+  // try {
+  //   const result = await callApi('GET')
+  //   console.log('fetching result')
+  //   console.log(result)
+  //   ownTodos = result.ownTodos
+  //   externalTodos = result.externalTodos
+  //   sharedUsers = result.sharedUsers
+  //   externalUsers = result.externalUsers
+  //   todos = [...ownTodos, ...externalTodos]
+  //   currentViewMode = 'All'
+  // } catch (e) {
+  //   console.log(e)
+  // }
+  // render()
+  // console.log('fetching')
   let isResponseOk = false
   callApi('GET')
     .then((response) => {
@@ -41,15 +65,27 @@ async function fetchTodos(todosCopy = null) {
       return response.json()
     })
     .then((result) => {
+      console.log('fetch result: ')
       console.log(result)
       if (isResponseOk) {
-        todos = result
+        console.log('response is ok')
+        ownTodos = result.ownTodos
+        externalTodos = result.externalTodos
+        sharedUsers = result.sharedUsers
+        sharedUsers.push('alex', 'john', 'selena')
+        externalUsers = result.externalUsers
+        todos = [...ownTodos, ...externalTodos]
         currentViewMode = 'All'
+        console.log(currentViewMode)
       } else {
-        todos = []
+        console.log('response isnt ok')
+        ownTodos = []
+        externalTodos = []
+        sharedUsers = []
+        externalUsers = []
         currentViewMode = 'Login'
+        console.log(currentViewMode)
       }
-      console.log(todos)
       render()
     })
     .catch((err) => {
@@ -58,32 +94,50 @@ async function fetchTodos(todosCopy = null) {
     })
 }
 
-async function addToDB(todoTitle, todosCopy) {
-  callApi('POST', { title: `${todoTitle}` }).then((response) => response.json()).then((result) => {
-    if (result.ok) {
-      fetchTodos(todosCopy)
+async function addToDB(todoTitle, todosCopy = [...todos]) {
+  let isResponseOk = false
+  callApi('POST', { title: todoTitle, owner: currentUser }).then((response) => {
+    isResponseOk = response.ok
+    response.json()
+  }).then((result) => {
+    if (isResponseOk) {
+      fetchData(todosCopy)
     } else {
       currentViewMode = 'Login'
     }
   }).catch((err) => console.log(err))
 }
 
+async function addSharedUserToDB(user, todosCopy = [...todos]) {
+  let isResponseOk = false
+  callApi('PUT', { user }, '/user/addSharedUser').then((response) => {
+    isResponseOk = response.ok
+    response.json()
+  }).then((result) => {
+    if (isResponseOk) {
+      fetchData(todosCopy)
+    } else {
+      currentViewMode = 'Login'
+    }
+  }).catch((e) => console.log(e))
+}
+
 async function removeFromDB(id, todosCopy) {
   callApi('DELETE', { _id: `${id}` }).then((response) => response.json()).catch((err) => console.log(err))
-  fetchTodos(todosCopy)
+  fetchData(todosCopy)
 }
 
 async function updateInDB(idToUpdate, newProp, todosCopy) {
   callApi('PUT', { _id: idToUpdate, updKeyValue: newProp }).then((response) => response.json()).catch((err) => console.log(err))
-  fetchTodos(todosCopy)
+  fetchData(todosCopy)
 }
 
-async function login(userLogin, password) {
-  callApi('POST', { login: userLogin, password }, '/signUp').then((response) => response.text()).then((result) => {
+async function login(usersLogin, usersPassword) {
+  callApi('POST', { login: usersLogin, password: usersPassword }, '/signUp').then((response) => response.text()).then((result) => {
     if (result !== 'Forbidden') {
-      console.log(`setting token ${result}`)
       localStorage.setItem('token', `Bearer ${result}`)
-      fetchTodos()
+      currentUser = usersLogin
+      fetchData()
     } else {
       throw new Error('Invalid token')
     }
@@ -105,38 +159,43 @@ function updateItemsLeft(todosArr) {
 }
 
 function updateTodo(event) {
-  const reserveCopy = [...todos]
-  const indexToUpdate = todos.findIndex(
-    () => todo._id === event.target.closest('li').id,
-  )
-  console.log(indexToUpdate)
-  const updatingInputContainer = createElement('div')
-  updatingInputContainer.classList.add('updating-input-container')
-  const updatingInput = createElement('input')
-  updatingInput.type = 'text'
-  updatingInput.value = event.target.innerText
-  const submitButton = createElement('button')
-  submitButton.type = 'button'
-  submitButton.classList.add('submit-button')
-  submitButton.innerHTML = '&#10004;'
-  const cancelButton = createElement('button')
-  cancelButton.type = 'button'
-  cancelButton.classList.add('cancel-button')
-  cancelButton.innerHTML = '&times'
-  updatingInputContainer.append(updatingInput, submitButton, cancelButton)
-  event.target.replaceWith(updatingInputContainer)
-  updatingInput.focus()
-  submitButton.addEventListener('click', () => {
-    if (indexToUpdate + 1) {
-      todos[indexToUpdate].title = updatingInput.value
-      console.log(todos[indexToUpdate].title)
-      updateInDB(todos[indexToUpdate]._id, { title: todos[indexToUpdate].title })
+  console.log('closest span')
+  console.log(event.target.closest('li').querySelector('.owner').innerText.split(' ')[1])
+  const owner = event.target.closest('li').querySelector('.owner').innerText.split(' ')[1]
+  if (owner === 'You') {
+    const reserveCopy = [...todos]
+    const indexToUpdate = todos.findIndex(
+      (todo) => todo._id === event.target.closest('li').id,
+    )
+    console.log(indexToUpdate)
+    const updatingInputContainer = createElement('div')
+    updatingInputContainer.classList.add('updating-input-container')
+    const updatingInput = createElement('input')
+    updatingInput.type = 'text'
+    updatingInput.value = event.target.innerText
+    const submitButton = createElement('button')
+    submitButton.type = 'button'
+    submitButton.classList.add('submit-button')
+    submitButton.innerHTML = '&#10004;'
+    const cancelButton = createElement('button')
+    cancelButton.type = 'button'
+    cancelButton.classList.add('cancel-button')
+    cancelButton.innerHTML = '&times'
+    updatingInputContainer.append(updatingInput, submitButton, cancelButton)
+    event.target.replaceWith(updatingInputContainer)
+    updatingInput.focus()
+    submitButton.addEventListener('click', () => {
+      if (indexToUpdate + 1) {
+        todos[indexToUpdate].title = updatingInput.value
+        console.log(todos[indexToUpdate].title)
+        updateInDB(todos[indexToUpdate]._id, { title: todos[indexToUpdate].title })
+        render(todos, currentViewMode)
+      }
+    })
+    cancelButton.addEventListener('click', () => {
       render(todos, currentViewMode)
-    }
-  })
-  cancelButton.addEventListener('click', () => {
-    render(todos, currentViewMode)
-  })
+    })
+  }
 }
 
 function filter(viewMode) {
@@ -173,11 +232,31 @@ function filter(viewMode) {
   }
 }
 
+function addSharedUser(newUser) {
+  sharedUsers.push(newUser)
+  addSharedUserToDB(newUser)
+  render()
+  // add apis call
+}
+
+function fillSharedUsersList(user) {
+  const sharedUser = createElement('li')
+  sharedUser.innerText = user
+  return sharedUser
+}
+
 function addEventListeners(viewMode = currentViewMode) {
   if (viewMode !== 'Login') {
     let isDoubleClick
 
     document.querySelector('.input-field').addEventListener('keydown', addTodo)
+
+    document.querySelector('.add-shared-user-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        console.log('added')
+        addSharedUser(event.target.value)
+      }
+    })
 
     // document.querySelectorAll('input[type=checkbox]').addEventListener('click', (event) => {
     //   event.preventDefault()
@@ -216,14 +295,19 @@ function addEventListeners(viewMode = currentViewMode) {
     document.querySelector('.login-button').addEventListener('click', (event) => {
       login(document.querySelector('.login-field').value, document.querySelector('.password-field').value)
     })
+    document.addEventListener('keydown', (event) => {
+      if (currentViewMode === 'Login' && event.key === 'Enter') {
+        login(document.querySelector('.login-field').value, document.querySelector('.password-field').value)
+      }
+    })
   }
 }
 
 function fillTodoList(todo, index, todoList) {
   const todoItem = createElement('li')
   todoItem.id = todo._id || null
-  const connector = createElement('div')
-  connector.classList.add('connector')
+  const titleBox = createElement('div')
+  titleBox.classList.add('connector')
   todoItem.classList.add('todo-item')
   const checkbox = createElement('input')
   checkbox.type = 'checkbox'
@@ -238,12 +322,20 @@ function fillTodoList(todo, index, todoList) {
   }
   todoTitle.innerText = todo.title
 
+  const owner = createElement('span')
+  owner.classList.add('owner')
+  owner.innerText = `owner: ${todo.owner === currentUser ? 'You' : todo.owner}`
+
   const removeButton = createElement('button')
   removeButton.innerHTML = '&times'
   removeButton.classList.add('remove-button')
   removeButton.type = 'button'
-  connector.append(checkbox, todoTitle)
-  todoItem.append(connector, removeButton)
+
+  const ownerRemoverBox = createElement('div')
+  ownerRemoverBox.append(owner, removeButton)
+
+  titleBox.append(checkbox, todoTitle)
+  todoItem.append(titleBox, ownerRemoverBox)
 
   todoList.append(todoItem)
   // addSrc(todo, index, todoItem);
@@ -353,9 +445,23 @@ function renderTodos(todosArr = todos, viewMode = currentViewMode) {
     clearCompletedButton.innerText = 'Clear Completed'
     bottomPanel.append(itemsLeft, buttonsContainer, clearCompletedButton)
   }
+  const shareListContainer = createElement('div')
+  shareListContainer.classList.add('share-list-container')
+  const shareList = createElement('ul')
+  shareList.classList.add('share-list')
+
+  sharedUsers.forEach((user) => {
+    shareList.append(fillSharedUsersList(user))
+  })
+
+  const addSharedUserInput = createElement('input')
+  addSharedUserInput.type = 'text'
+  addSharedUserInput.classList.add('add-shared-user-input')
+  addSharedUserInput.placeholder = 'Add shared user'
+  shareListContainer.append(addSharedUserInput, shareList)
 
   mainContainer.append(inputField, todosContainer, bottomPanel)
-  document.body.append(mainContainer)
+  document.body.append(mainContainer, shareListContainer)
 
   if (viewMode === 'All') {
     todosArr.forEach((todo, index) => {
@@ -409,6 +515,7 @@ function addTodo(event) {
     render(todos, currentViewMode)
     updateItemsLeft(todos)
     nextId += 1
+    console.log(`title: ${event.target.value}`)
     addToDB(event.target.value, reserveCopy)
     event.target.value = ''
     event.target.focus()
@@ -470,6 +577,6 @@ function toggleReadyState(event) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // await fetchTodos()
+  await fetchData()
   render()
 })
