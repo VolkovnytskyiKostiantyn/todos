@@ -43,6 +43,7 @@ body {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+  cursor: pointer;
 }
 
 .remove-button {
@@ -69,10 +70,6 @@ body {
 
 .active {
   color: orange;
-}
-
-span {
-  cursor: pointer;
 }
 
 .updating-input-container {
@@ -139,4 +136,31 @@ top: 0;
 
 .owner {
   display: inline-block
+}
+
+.quantity {
+  cursor: default;
+}
+
+button {
+  cursor: pointer
+}
+
+.logout-section {
+  width: 75px;
+  border: 1px solid gray;
+  border-radius: 10px;
+  padding: 5px;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.current-user-span {
+  display: inline-block;
+  margin-bottom: 5px;
+}
+
+.logout-button {
+
 }

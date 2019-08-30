@@ -1,11 +1,9 @@
 import css from './styles.css'
 
 let currentUser
-let ownTodos = []
-let externalTodos = []
 let todos = []
 let sharedUsers = []
-let externalUsers = []
+const externalUsers = []
 let currentViewMode = 'Login'
 let timeoutId
 let nextId = 0
@@ -18,8 +16,6 @@ function createElement(tagName) {
 async function callApi(type, customBody = null, additionalPath = '/') {
   let response
   const token = localStorage.getItem('token')
-  console.log('body: ')
-  console.log(customBody)
   if (type === 'GET' || type === 'HEAD') {
     response = await fetch(`http://localhost:9999${additionalPath}`, {
       method: type,
@@ -38,60 +34,43 @@ async function callApi(type, customBody = null, additionalPath = '/') {
       body: JSON.stringify(customBody),
     })
   }
-  console.log(response)
   return response
 }
 function fetchData(todosCopy = null) {
   console.log('fetching')
-  // try {
-  //   const result = await callApi('GET')
-  //   console.log('fetching result')
-  //   console.log(result)
-  //   ownTodos = result.ownTodos
-  //   externalTodos = result.externalTodos
-  //   sharedUsers = result.sharedUsers
-  //   externalUsers = result.externalUsers
-  //   todos = [...ownTodos, ...externalTodos]
-  //   currentViewMode = 'All'
-  // } catch (e) {
-  //   console.log(e)
-  // }
-  // render()
-  // console.log('fetching')
   let isResponseOk = false
   callApi('GET')
     .then((response) => {
       isResponseOk = response.ok
+      console.log('isResponseOk')
+      console.log(isResponseOk)
       return response.json()
     })
     .then((result) => {
       console.log('fetch result: ')
       console.log(result)
       if (isResponseOk) {
-        console.log('response is ok')
-        ownTodos = result.ownTodos
-        externalTodos = result.externalTodos
+        console.log(result)
         sharedUsers = result.sharedUsers
-        sharedUsers.push('alex', 'john', 'selena')
-        externalUsers = result.externalUsers
-        todos = [...ownTodos, ...externalTodos]
+        todos = result.todos
+        currentUser = result.login
+        localStorage.setItem('token', `Bearer ${result.token}`)
         currentViewMode = 'All'
-        console.log(currentViewMode)
+        console.log(todos)
+        render()
       } else {
-        console.log('response isnt ok')
-        ownTodos = []
-        externalTodos = []
+        todos = []
         sharedUsers = []
-        externalUsers = []
+        currentUser = ''
         currentViewMode = 'Login'
         console.log(currentViewMode)
+        render()
       }
-      render()
     })
     .catch((err) => {
       currentViewMode = 'Login'
-      render()
     })
+  render()
 }
 
 async function addToDB(todoTitle, todosCopy = [...todos]) {
@@ -109,17 +88,25 @@ async function addToDB(todoTitle, todosCopy = [...todos]) {
 }
 
 async function addSharedUserToDB(user, todosCopy = [...todos]) {
-  let isResponseOk = false
-  callApi('PUT', { user }, '/user/addSharedUser').then((response) => {
-    isResponseOk = response.ok
-    response.json()
-  }).then((result) => {
-    if (isResponseOk) {
-      fetchData(todosCopy)
-    } else {
-      currentViewMode = 'Login'
-    }
-  }).catch((e) => console.log(e))
+  try {
+    // const isResponseOk = false
+    const response = await callApi('PUT', { user }, '/user/addSharedUser')
+    console.log(response)
+  } catch (e) {
+    console.log(e)
+  }
+  //   .then((response) => {
+  //   isResponseOk = response.ok
+  //   console.log(isResponseOk)
+  //   response.json()
+  // }).then((result) => {
+  //   if (isResponseOk) {
+  //     console.log('response is ok')
+  //   } else {
+  //     console.log('response isnt ok')
+  //     currentViewMode = 'Login'
+  //   }
+  // }).catch((e) => console.log(e))
 }
 
 async function removeFromDB(id, todosCopy) {
@@ -137,6 +124,7 @@ async function login(usersLogin, usersPassword) {
     if (result !== 'Forbidden') {
       localStorage.setItem('token', `Bearer ${result}`)
       currentUser = usersLogin
+      console.log(currentUser)
       fetchData()
     } else {
       throw new Error('Invalid token')
@@ -162,10 +150,14 @@ function updateTodo(event) {
   console.log('closest span')
   console.log(event.target.closest('li').querySelector('.owner').innerText.split(' ')[1])
   const owner = event.target.closest('li').querySelector('.owner').innerText.split(' ')[1]
+  console.log(todos)
   if (owner === 'You') {
     const reserveCopy = [...todos]
     const indexToUpdate = todos.findIndex(
-      (todo) => todo._id === event.target.closest('li').id,
+      (todo) => {
+        console.log(event.target.closest('li'))
+        return todo._id === event.target.closest('li').id
+      },
     )
     console.log(indexToUpdate)
     const updatingInputContainer = createElement('div')
@@ -232,9 +224,11 @@ function filter(viewMode) {
   }
 }
 
-function addSharedUser(newUser) {
+async function addSharedUser(newUser) {
   sharedUsers.push(newUser)
-  addSharedUserToDB(newUser)
+  render() // delete after correct renderin of added users
+  await addSharedUserToDB(newUser)
+  await fetchData()
   render()
   // add apis call
 }
@@ -245,9 +239,17 @@ function fillSharedUsersList(user) {
   return sharedUser
 }
 
+function logout() {
+  localStorage.removeItem('token')
+  currentViewMode = 'Login'
+  render()
+}
+
 function addEventListeners(viewMode = currentViewMode) {
   if (viewMode !== 'Login') {
     let isDoubleClick
+
+    document.querySelector('.logout-button').addEventListener('click', logout)
 
     document.querySelector('.input-field').addEventListener('keydown', addTodo)
 
@@ -297,6 +299,7 @@ function addEventListeners(viewMode = currentViewMode) {
     })
     document.addEventListener('keydown', (event) => {
       if (currentViewMode === 'Login' && event.key === 'Enter') {
+        console.log('bingo')
         login(document.querySelector('.login-field').value, document.querySelector('.password-field').value)
       }
     })
@@ -460,8 +463,19 @@ function renderTodos(todosArr = todos, viewMode = currentViewMode) {
   addSharedUserInput.placeholder = 'Add shared user'
   shareListContainer.append(addSharedUserInput, shareList)
 
+  const logoutSection = createElement('section')
+  logoutSection.classList.add('logout-section')
+  const currentUserSpan = createElement('span')
+  currentUserSpan.classList.add('current-user-span')
+  currentUserSpan.innerText = currentUser
+  const logoutButton = createElement('button')
+  logoutButton.classList.add('logout-button')
+  logoutButton.type = 'button'
+  logoutButton.innerText = 'Log Out'
+  logoutSection.append(currentUserSpan, logoutButton)
+
   mainContainer.append(inputField, todosContainer, bottomPanel)
-  document.body.append(mainContainer, shareListContainer)
+  document.body.append(logoutSection, mainContainer, shareListContainer)
 
   if (viewMode === 'All') {
     todosArr.forEach((todo, index) => {
@@ -488,6 +502,7 @@ function renderTodos(todosArr = todos, viewMode = currentViewMode) {
 }
 
 function render(todosArr = todos, viewMode = currentViewMode) {
+  console.log(localStorage.getItem('token'))
   if (document.body.firstChild) {
     while (document.body.firstChild) {
       document.body.removeChild(document.body.firstChild)
@@ -499,7 +514,6 @@ function render(todosArr = todos, viewMode = currentViewMode) {
   } else {
     renderLoginForm()
   }
-
   addEventListeners()
 }
 
@@ -510,6 +524,7 @@ function addTodo(event) {
       title: event.target.value,
       isCompleted: false,
       id: nextId,
+      owner: currentUser,
     }
     todos.push(newTodo)
     render(todos, currentViewMode)
@@ -519,6 +534,7 @@ function addTodo(event) {
     addToDB(event.target.value, reserveCopy)
     event.target.value = ''
     event.target.focus()
+    fetchData()
     render(todos)
   }
 }
